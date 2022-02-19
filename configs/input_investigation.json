@@ -1,0 +1,65 @@
+{
+  "model_name": "input_invest",
+  "trainer_name": "input_invest",
+  "data_path": null,
+  "data_name": "encoder",
+
+  "exp_name": "input_dist_investigation",
+  "run_name": "new_trapdoor",
+  "tag_name": "p_05",
+
+  "config": "./configs/input_investigation.json",
+
+  "x_dim": 1,
+  "y_dim": 1,
+
+  "data_batches": 5000,
+  "eval_freq": 200,
+  "q_train_freq": 5,
+  "quiet": null,
+  "seed": null,
+
+  "bptt": 6,
+  "contrastive_duplicates": 5,
+  "batch_size" : 1500,
+  "channel_name": "trapdoor",
+  "feedback": 0,
+
+  "dtype": "binary",
+  "dropout": 0,
+  "clip_likelihood_ratio": [-10.0, 10.0],
+  "weight_decay": 0.0,
+
+  "train_epoch_len": 50,
+  "eval_epoch_len": 500,
+  "visualize_epoch_len": 50,
+  "long_eval_epoch_len": 100,
+
+
+  "enc_hidden_lstm": 50,
+  "enc_hidden": [100,50],
+  "enc_last_hidden": 1,
+  "enc_dropout": 0.0,
+  "batch_size_eval" : 5000,
+  "batches": 15,
+  "alphabet_size": 2,
+
+  "GE_g":0.0015,
+  "GE_b": 0.0005,
+  "GE_p_g": 0.02,
+  "GE_p_b": 0.5,
+
+  "p_post": 0.5,
+  "eta_post": 0.5,
+  "p_ising": 0.5,
+  "p_trapdoor": 0.5,
+  "p_bsc": 0.5,
+  "p_z": 0.9,
+  "p_bec": 0.3,
+
+  "optimizer": "adam",
+  "lr_SGD": 0.2,
+  "decay": 0,
+
+  "reset_channel": 0
+}

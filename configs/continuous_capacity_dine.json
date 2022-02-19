@@ -1,0 +1,60 @@
+{
+  "model_name": "cont_ndt",
+  "trainer_name": "cont_ndt",
+  "data_path": null,
+  "data_name": "cont_ndt",
+
+  "exp_name": "continuous_dine",
+  "run_name": "ndt_debug",
+  "tag_name": "debug_awgn",
+
+  "config": "./configs/continuous_capacity_dine.json",
+
+  "x_dim": 1,
+  "y_dim": 1,
+  "eval_freq": 200,
+  "quiet": null,
+  "seed": null,
+
+  "bptt": 2,
+  "contrastive_duplicates": 2,
+  "batch_size" : 150,
+  "lr": 0.0001,
+  "num_epochs": 20000,
+  "channel_name": "awgn",
+  "feedback": 1,
+  "batches": 15,
+  "batch_size_eval" : 5000,
+
+
+  "dtype": "continuous",
+  "alphabet_size": 1,
+  "clip_grad_norm": 0.1,
+  "clip_grad_norm_enc": 0.2,
+  "dropout": 0,
+
+  "enc_hidden": [100, 100, 100],
+  "hidden_size": [100, 150, 10],
+  "dv_hidden": [100, 150, 10],
+
+  "clip_likelihood_ratio": [-10.0, 10.0],
+  "weight_decay": 0.0,
+  "max_norm_y": 5,
+  "max_norm_xy": 5,
+
+  "train_epoch_len": 50,
+  "eval_epoch_len": 500,
+  "visualize_epoch_len": 50,
+  "long_eval_epoch_len": 100,
+  "compression_flag": 0,
+
+  "ndt_dropout": 0.0,
+  "awgn_variance": 1.0,
+  "ndt_power_constraint": 1.0,
+  "constraint_name": "norm",
+
+  "optimizer": "adam",
+  "lr_SGD": 0.2,
+  "decay": 0
+
+}
