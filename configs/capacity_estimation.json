@@ -2,12 +2,6 @@
   "model_name": "cap_est",
   "trainer_name": "cap_est",
 
-
-  "old_model_name": "di_with_enc_states",
-  "working_trainer_and_enc_name": "di_with_enc_states",
-  "working_trainer_and_enc_name_saving_model": "di_with_enc_states_new",
-  "PDINE_trainer_and_models_name": "PDINE",
-  "Q_graph_trainer_and_models_name": "q_est",
   "data_path": null,
   "data_name": "encoder",
 

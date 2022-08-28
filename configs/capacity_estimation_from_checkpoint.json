@@ -1,5 +1,5 @@
 {
-  "model_name": "di_with_enc_states",
+  "model_name": "cap_est",
   "trainer_name": "cap_est_checkpoint",
   "data_path": null,
   "data_name": "encoder",
