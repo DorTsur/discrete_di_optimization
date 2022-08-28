@@ -22,7 +22,7 @@
   "contrastive_duplicates": 5,
   "batch_size" : 1500,
   "lr": 0.0019,
-  "num_epochs": 80000,
+  "num_epochs": 10,
   "channel_name": "ising",
   "feedback": 0,
   "p_bsc": 0.5,
@@ -75,5 +75,7 @@
   "clip_grad_norm_q": 100,
   "reset_channel": 0,
 
-  "noise_layer_q_std": 0.05
+  "noise_layer_q_std": 0.05,
+
+  "using_wandb": 0
 }

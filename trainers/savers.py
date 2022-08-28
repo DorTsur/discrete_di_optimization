@@ -189,6 +189,21 @@ class Q_est_saver(Visualizer):
                     models[model].save_weights(filepath=path)
         save_recursively(models, path)
 
+# For MINE-based simulations:
+class PMFMINE_saver(Visualizer):
+    def __init__(self, config):
+        # Class for saving DV potentials values
+        super().__init__(config)
+        self.path = config.tensor_board_dir
+
+    def save(self, pmf, model, name=None):
+        file_name = name if name is not None else 'raw_data_latest.mat'
+        savemat(os.path.join(self.config.tensor_board_dir, 'visual',
+                             file_name), {"PMF": pmf})
+        model.save(filepath=os.path.join(self.path, "PMF_model"))
+
+    def histogram(self,x):
+        return
 
 
 ####################

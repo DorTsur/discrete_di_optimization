@@ -1,0 +1,66 @@
+{
+  "model_name": "mine_cap_est",
+  "trainer_name": "mine_pmf",
+  "data_name": "mine_pmf",
+
+  "exp_name": "debug_square",
+  "run_name": "debug",
+  "tag_name": "16qam",
+
+  "config": "./configs/capacity_estimation_mine_qam.json",
+
+  "x_alphabet": 16,
+  "y_dim": 2,
+  "x_dim": 2,
+  "constellation": "qam_p_norm",
+  "pmf_regul_factor": 0.0,
+  "cuda_visible": "0",
+
+  "eval_freq": 100,
+  "quiet": null,
+  "seed": null,
+
+  "mine_intial_epochs": 500,
+  "mine_per_pmf_update": 3,
+  "batch_size" : 2500,
+  "lr": 0.001,
+  "num_epochs": 2500,
+  "channel_name": "awgn",
+
+  "clip_grad_norm_dv": 10.0,
+  "clip_grad_norm_pmf": 10.0,
+
+  "dropout": 0,
+
+  "batch_size_eval" : 10000,
+  "batches": 10,
+
+  "optimizer": "adam",
+
+  "DV_hidden": [100,100],
+  "DV_dropout": 0.0,
+  "dv_regularize": 0,
+
+
+  "A_min": -1,
+  "A_max": 1,
+
+  "A": 1.0,
+
+  "channel": "awgn",
+  "snr": -10.0,
+  "noise_var": 0.01,
+
+  "train_epoch_len": 50,
+  "eval_epoch_len": 500,
+  "visualize_epoch_len": 50,
+  "long_eval_epoch_len": 100,
+
+  "pmf_eval_freq": 1000,
+  "reg_coef": 0.01,
+
+  "using_wandb": 0,
+  "wandb_project_name": "mi_opt_qam_gaussian",
+  "pmf_train_freq": 3
+
+}

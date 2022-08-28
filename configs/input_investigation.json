@@ -61,5 +61,7 @@
   "lr_SGD": 0.2,
   "decay": 0,
 
-  "reset_channel": 0
+  "reset_channel": 0,
+
+  "using_wandb": 0
 }

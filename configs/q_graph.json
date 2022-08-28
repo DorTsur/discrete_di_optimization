@@ -76,5 +76,7 @@
   "clip_grad_norm_q": 100,
   "reset_channel": 0,
 
-  "noise_layer_q_std": 0.05
+  "noise_layer_q_std": 0.05,
+
+  "using_wandb": 0
 }

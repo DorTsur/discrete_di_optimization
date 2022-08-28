@@ -2,6 +2,7 @@ import tensorflow as tf
 from models.DV_model import DVModel, DVModel_with_states
 from models.enc_model import PMFModel, PMFModelQ_train, PMFModelQ_eval
 from models.Q_estimator_model import QModel
+from models.mine_sim_models import DVMINEModel, PMFMINEModel, SamplerMINEModel
 tf.keras.backend.set_floatx('float64')
 
 
@@ -29,6 +30,16 @@ def build_model(config):
     elif config.model_name == "input_invest":  # DINE + Enc. models
         model = {
             'enc': PMFModelQ_train(config)
+        }
+    elif config.model_name == "mine_cap_est":
+        model = {
+            'dv': DVMINEModel(config),
+            'dv_eval': DVMINEModel(config),
+
+            'pmf': PMFMINEModel(config),
+            'pmf_eval': PMFMINEModel(config),
+
+            'sampler': SamplerMINEModel(config)
         }
     else:
         raise ValueError("'{}' is an invalid model name")

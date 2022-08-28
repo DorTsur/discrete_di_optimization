@@ -279,3 +279,104 @@ class pdine_metrics(ModelMetrics):
         self.metric_pool[1].update_state(data["t_y"][0], data["t_y"][1])
         self.metric_pool[2].update_state(data["t_y"][0], data["t_y"][1], data["t_xy"][0], data["t_xy"][1])
 
+
+
+### For MINE based simulations:
+class MINE_PMF_metrics(tf.keras.metrics.Metric):
+
+    def __init__(self, writer, name='', **kwargs):
+        super(MINE_PMF_metrics, self).__init__(name=name, **kwargs)
+        self.writer = writer
+        self.metric_pool = [DVMINE_metric(name='dv_{}'.format(name)),
+                            DVMINE_bits_metric(name='dv_bits_{}'.format(name)),
+                            PMFMINE_loss_metric(name='pmf_loss_{}'.format(name))]
+
+
+    def update_state(self, metric_input, **kwargs):
+        [t, t_, p, ind] = metric_input
+        self.metric_pool[0].update_state(t, t_)
+        self.metric_pool[1].update_state(t, t_)
+        self.metric_pool[2].update_state(t, p, ind)
+
+    def result(self):
+        return [metric.result() for metric in self.metric_pool]
+
+    def reset_states(self):
+        for metric in self.metric_pool:
+            metric.reset_states()
+        return
+
+    def log_metrics(self, epoch, model_name):
+        # log to tensorboard
+        with self.writer.as_default():
+            for metric in self.metric_pool:
+                tf.summary.scalar(metric.name, metric.result(), epoch)
+
+        # print to terminal
+        msg = ["{} Epoch: {:05d}\t".format(self.name, epoch)]
+        for metric in self.metric_pool:
+            if np.isnan(metric.result()):
+                raise ValueError("NaN appeared in metric {}".format(metric.name))
+            msg.append("{:s} {:3.6f}\t".format(metric.name, float(metric.result())))
+        msg.append(model_name)
+        logger.info("\t".join(msg))
+
+
+class DVMINE_metric(tf.keras.metrics.Metric):  # estimated DV loss calcaultion metric class
+    def __init__(self, name='dv_loss', **kwargs):
+        super(DVMINE_metric, self).__init__(name=name, **kwargs)
+        self.T = self.add_weight(name='t', initializer='zeros')
+        self.exp_T_bar = self.add_weight(name='exp_t_bar', initializer='zeros')
+        self.global_counter = self.add_weight(name='n', initializer='zeros')
+        self.global_counter_ref = self.add_weight(name='n_ref', initializer='zeros')
+
+    def update_state(self, T, T_bar, **kwargs):
+        self.T.assign(self.T + tf.reduce_sum(T))
+        self.exp_T_bar.assign(self.exp_T_bar + tf.reduce_sum(T_bar))
+        self.global_counter.assign(self.global_counter + tf.cast(tf.reduce_prod(T.shape[:-1]), dtype=tf.float64))
+        self.global_counter_ref.assign(self.global_counter_ref + tf.cast(tf.reduce_prod(T_bar.shape[:-1]), dtype=tf.float64))
+
+    def result(self):
+        loss = self.T / self.global_counter - K.log(self.exp_T_bar / self.global_counter_ref)
+        return loss
+
+class DVMINE_bits_metric(tf.keras.metrics.Metric):  # estimated DV loss calcaultion metric class
+    def __init__(self, name='dv_loss', **kwargs):
+        super(DVMINE_bits_metric, self).__init__(name=name, **kwargs)
+        self.T = self.add_weight(name='t', initializer='zeros')
+        self.exp_T_bar = self.add_weight(name='exp_t_bar', initializer='zeros')
+        self.global_counter = self.add_weight(name='n', initializer='zeros')
+        self.global_counter_ref = self.add_weight(name='n_ref', initializer='zeros')
+
+    def update_state(self, T, T_bar, **kwargs):
+        self.T.assign(self.T + tf.reduce_sum(T))
+        self.exp_T_bar.assign(self.exp_T_bar + tf.reduce_sum(T_bar))
+        self.global_counter.assign(self.global_counter + tf.cast(tf.reduce_prod(T.shape[:-1]), dtype=tf.float64))
+        self.global_counter_ref.assign(self.global_counter_ref + tf.cast(tf.reduce_prod(T_bar.shape[:-1]), dtype=tf.float64))
+
+    def result(self):
+        loss = self.T / self.global_counter - K.log(self.exp_T_bar / self.global_counter_ref)
+        return loss/math.log(2)
+
+class PMFMINE_loss_metric(tf.keras.metrics.Metric):
+    def __init__(self, name='pmf_loss', **kwargs):
+        super(PMFMINE_loss_metric, self).__init__(name=name, **kwargs)
+        self.T = self.add_weight(name='t', initializer='zeros')
+        self.global_counter = self.add_weight(name='n', initializer='zeros')
+
+
+    def update_state(self, T, p, ind, **kwargs):
+        batch_size = tf.reduce_prod(T.shape[:-1]).numpy()
+        # n_ind = tf.cast(tf.expand_dims(tf.linspace(start=0, stop=batch_size - 1, num=batch_size), axis=-1),
+        #                 'int64')
+        # x_ind = tf.concat([n_ind, tf.cast(ind, 'int64')], axis=-1)
+        n_ind = tf.cast(tf.expand_dims(np.linspace(start=0, stop=batch_size - 1, num=batch_size), axis=-1),
+                        'int64')
+        x_ind = tf.concat([n_ind, tf.cast(ind, 'int64')], axis=-1)
+        p_loss = (T-tf.reduce_mean(T))*tf.math.log(tf.gather_nd(indices=x_ind, params=p))
+        self.T.assign(self.T + tf.reduce_sum(p_loss))
+        self.global_counter.assign(self.global_counter + tf.cast(tf.reduce_prod(T.shape[:-1]), dtype=tf.float64))
+
+    def result(self):
+        loss = self.T / self.global_counter
+        return loss

@@ -40,16 +40,15 @@ def read_config(args):
     if args.config is not None:
         json_file = args.config
     else:
+        # Optional config files when not run from outside environment:
         # raise ValueError("preprocess config: config path wasn't specified")
         json_file = './configs/capacity_estimation.json'  # current pdine config
         # json_file = './configs/capacity_estimation_from_checkpoint.json'  # current pdine config
         # json_file = './configs/q_graph.json'  # current pdine config
         # json_file = './configs/input_investigation.json'  # input investigation config
+        # json_file = './configs/capacity_estimation_mine_1d.json'  # input investigation config
+        # json_file = './configs/capacity_estimation_mine_qam.json'  # input investigation config
 
-
-        # json_file = './configs/pdine_new_debug.json'  # for new pdine config
-        # json_file = './configs/pdine_old_for_debug.json'  # for old pdine config
-        # json_file = './configs/continuous_capacity_dine.json'  # for old pdine config
 
     config_dict = read_json_to_dict(json_file)
     config = Config(config_dict)

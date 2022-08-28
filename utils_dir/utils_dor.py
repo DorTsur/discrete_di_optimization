@@ -7,6 +7,7 @@ import sys
 import tensorflow as tf
 from utils_dir.config import read_config
 from utils_dir.logger import set_logger_and_tracker
+import wandb
 
 CONFIG_WAIVER = ['save_model', 'quiet', 'sim_dir']
 
@@ -94,7 +95,14 @@ def save_scripts(config):
 def preprocess_meta_data():
     args = get_args()
     config = read_config(args)
+    # os.environ["CUDA_VISIBLE_DEVICES"] = config.cuda_visible if config.cuda_visible is not None else "2"
     gpu_init()
     set_logger_and_tracker(config)
     save_scripts(config)
+
+    if config.using_wandb:
+        wandb.init(project=config.wandb_project_name,
+               entity="dortsur",
+               config=config)
+
     return config

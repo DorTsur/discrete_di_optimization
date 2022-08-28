@@ -1,0 +1,67 @@
+{
+  "model_name": "mine_cap_est",
+  "trainer_name": "mine_pmf",
+  "data_name": "mine_pmf",
+
+
+
+  "exp_name": "alphabet_sweep_1",
+  "run_name": "debug",
+  "tag_name": "debug",
+
+  "config": "./configs/capacity_estimation_mine_1d.json",
+
+  "x_alphabet": 9,
+  "y_dim": 1,
+  "x_dim": 1,
+  "constellation": "1d",
+  "cuda_visible": "2",
+
+  "eval_freq": 200,
+  "quiet": null,
+  "seed": null,
+
+  "batch_size" : 2500,
+  "lr": 0.001,
+  "num_epochs": 4000,
+  "channel_name": "awgn",
+  "pmf_regul_factor": 0.0,
+
+  "constellation_by_A": 0,
+
+  "clip_grad_norm_dv": 10.0,
+  "clip_grad_norm_pmf": 10.0,
+
+  "dropout": 0,
+
+  "batch_size_eval" : 10000,
+  "batches": 10,
+
+  "optimizer": "adam",
+
+  "DV_hidden": [100,100],
+  "DV_dropout": 0.0,
+  "dv_regularize": 1,
+
+
+  "A_min": -1,
+  "A_max": 1,
+
+  "A": 1.0,
+
+  "channel": "awgn",
+  "snr": 19.0,
+
+  "train_epoch_len": 50,
+  "eval_epoch_len": 500,
+  "visualize_epoch_len": 50,
+  "long_eval_epoch_len": 100,
+
+  "pmf_eval_freq": 1000,
+  "reg_coef": 0.001,
+
+  "using_wandb": 0,
+  "wandb_project_name": "mi_opt_1d_guassian",
+  "pmf_train_freq": 3
+
+}
