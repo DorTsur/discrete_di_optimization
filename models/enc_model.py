@@ -12,6 +12,406 @@ from models.channel_methods import clean_channel, bsc_channel, z_channel, s_chan
 ##########################
 #  Encoder Models:
 ##########################
+def PMFModel(config):
+    """
+    Channel encoder model - generating [x,y,p]
+    """
+
+    def build(config):
+        def build_ff(config):
+            """
+            FF model case
+            """
+            # Initializers:
+            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
+
+            # Encoder transformation with sigmoid output:
+            encoder_transform = Sequential([
+                keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
+                                  batch_input_shape=[config.batch_size, 1, config.x_dim],
+                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
+                Dense(config.enc_hidden[1], activation="elu"),
+                # Dense(config.enc_last_hidden, activation="elu"),
+                Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer)])  # WITH SIGMOID AS LAST LAYER
+
+            p_out = list()  # list of calculated P(X|H)
+            enc_out = list()  # list of X values
+            channel_out = list()  # list of Y values
+
+            enc_in_feedback = keras.layers.Input(shape=[1, config.x_dim])  # Input layer
+            enc_in_0 = enc_in_feedback
+
+            for t in range(config.bptt):
+                if t == 0:
+                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append sampled x
+                else:
+                    enc_in_t = enc_out[t - 1]  # prepare input for time t
+                    p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append x_t
+
+                channel_out.append(channel(enc_out[t]))  # calculate y_t(x_t)
+
+            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
+            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
+            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
+
+            encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out])
+            return encoder
+
+
+        def build_fb(config):
+            """
+            FF model case
+            """
+            # Initializers:
+            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
+
+            encoder_transform = Sequential([
+                keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
+                                  batch_input_shape=[config.batch_size, 1, config.x_dim + config.y_dim],
+                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
+                Dense(config.enc_hidden[1], activation="elu"),
+                # Dense(config.enc_last_hidden, activation="elu"),
+                Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer)])
+
+            p_out = list()  # list of calculated P(X|H)
+            enc_out = list()  # list of X values
+            channel_out = list()  # list of Y values
+
+            enc_in_feedback = keras.layers.Input(shape=[1, config.y_dim + config.x_dim])  # Input layer
+            enc_in_0 = enc_in_feedback
+
+            for t in range(config.bptt):
+                if t == 0:
+                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
+                    # for debug:
+                    # p = encoder_transform(enc_in_0)
+                    # p_out.append(0.5*tf.ones(shape=[config.batch_size,1,1], dtype='float64')+0*p)
+                    ##
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append sampled x
+                else:
+                    enc_in_t = tf.concat([enc_out[t - 1], channel_out[t-1]], axis=-1)  # prepare input for time t
+                    p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
+                    # for debug:
+                    # p = encoder_transform(enc_in_0)
+                    # p_out.append(0.5 * tf.ones(shape=[config.batch_size, 1, 1], dtype='float64') + 0 * p)
+                    ##
+
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append x_t
+
+                channel_out.append(channel(enc_out[t]))  # calculate y_t(x_t)
+
+            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
+            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
+            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
+
+            encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out])
+            return encoder
+
+        channel = Channel_Layer(config=config)  # define channel layer
+        sampler_layer = SamplingLayer()
+        sampler = Sequential([sampler_layer])  # sampling model of x from p
+
+        if config.feedback == 1:
+            model = build_fb(config)  # build channel model with feedback, with axis(-1) = 3
+        else:
+            model = build_ff(config)  # build channel model without feedback, with axis(-1) = 2
+
+        return model
+
+    enc_model = build(config)
+
+    return enc_model
+
+
+def PMFModelQ_train(config):
+    """
+    Channel encoder model - generating [x,y,p]
+    """
+
+    def build(config):
+        def build_ff(config):
+            """
+            FF model case
+            """
+            # Initializers:
+            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
+
+            encoder_transform = Sequential([
+                keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
+                                  batch_input_shape=[config.batch_size, 1, config.x_dim],
+                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
+                Dense(config.enc_hidden[1], activation="elu"),
+                Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer)])
+
+            p_out = list()  # list of calculated P(X|H)
+            enc_out = list()  # list of X values
+            channel_out = list()  # list of Y values
+            channel_state = list()
+
+            enc_in_feedback = keras.layers.Input(shape=[1, config.x_dim])  # Input layer
+            enc_in_0 = enc_in_feedback
+
+            for t in range(config.bptt):
+                if t == 0:
+                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append sampled x
+                else:
+                    p_out.append(encoder_transform(enc_out[t - 1]))  # calculate p_t(in_t)
+
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append x_t
+
+                [y_t, s_t] = channel(enc_out[t])
+                channel_out.append(y_t)
+                channel_state.append(s_t)
+
+
+
+            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
+            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
+            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
+            channel_state = tf.concat(channel_state, axis=1)
+            encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out, channel_state])
+
+            return encoder
+
+        def build_fb(config):
+            """
+            FF model case
+            """
+            # Initializers:
+            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
+
+            encoder_transform = Sequential([
+                keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
+                                  batch_input_shape=[config.batch_size, 1, config.x_dim + config.y_dim],
+                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
+                Dense(config.enc_hidden[1], activation="elu"),
+                # Dense(config.enc_last_hidden, activation="elu"),
+                Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer)])
+
+            p_out = list()  # list of calculated P(X|H)
+            enc_out = list()  # list of X values
+            channel_out = list()  # list of Y values
+            channel_state = list()
+
+            enc_in_feedback = keras.layers.Input(shape=[1, config.y_dim + config.x_dim])  # Input layer
+            enc_in_0 = enc_in_feedback
+
+            for t in range(config.bptt):
+                if t == 0:
+                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
+                    # for debug:
+                    # p = encoder_transform(enc_in_0)
+                    # p_out.append(0.5*tf.ones(shape=[config.batch_size,1,1], dtype='float64')+0*p)
+                    ##
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append sampled x
+                else:
+                    enc_in_t = tf.concat([enc_out[t - 1], channel_out[t-1]], axis=-1)  # prepare input for time t
+                    p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
+                    # for debug:
+                    # p = encoder_transform(enc_in_0)
+                    # p_out.append(0.5 * tf.ones(shape=[config.batch_size, 1, 1], dtype='float64') + 0 * p)
+                    ##
+
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append x_t
+
+                [y_t, s_t] = channel(enc_out[t])
+                channel_out.append(y_t)
+                channel_state.append(s_t)
+
+
+
+            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
+            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
+            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
+            channel_state = tf.concat(channel_state, axis=1)
+            encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out, channel_state])
+
+            return encoder
+
+        channel = Channel_Layer_no_p_new(config=config)  # define channel layer
+        sampler_layer = SamplingLayer()
+        sampler = Sequential([sampler_layer])  # sampling model of x from p
+
+        if config.feedback == 1:
+            model = build_fb(config)  # build channel model with feedback, with axis(-1) = 3
+        else:
+            model = build_ff(config)  # build channel model without feedback, with axis(-1) = 2
+
+        return model
+
+    enc_model = build(config)
+
+    return enc_model
+
+
+def PMFModelQ_eval(config):
+    """
+    Channel encoder model - generating [x,y,p]
+    """
+
+    def build(config):
+        def build_ff(config, fsc_flag):
+            """
+            FF model case
+            """
+            # Initializers:
+            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
+
+            # Encoder transformation with sigmoid output:
+            encoder_transform = Sequential([
+                keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
+                                  batch_input_shape=[config.batch_size, 1, config.x_dim],
+                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
+                Dense(config.enc_hidden[1], activation="elu"),
+                # Dense(config.enc_last_hidden, activation="elu"),
+                Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer)])  # WITH SIGMOID AS LAST LAYER
+
+            p_out = list()  # list of calculated P(X|H)
+            enc_out = list()  # list of X values
+            channel_out = list()  # list of Y values
+            channel_state = list()
+
+            enc_in_feedback = keras.layers.Input(shape=[1, config.x_dim])  # Input layer
+            enc_in_0 = enc_in_feedback
+
+            for t in range(config.bptt):
+                if t == 0:
+                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append sampled x
+                else:
+                    enc_in_t = enc_out[t - 1]  # prepare input for time t
+                    p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append x_t
+
+                if fsc_flag:
+                    [y_t, s_t] = channel(enc_out[t])
+                    channel_out.append(y_t)
+                    channel_state.append(s_t)
+                else:
+                    channel_out.append(channel(enc_out[t]))  # calculate y_t(x_t)
+
+            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
+            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
+            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
+
+            if fsc_flag:
+                channel_state = tf.concat(channel_state, axis=1)
+                encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out, channel_state])
+                return encoder
+            else:
+                encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out])
+                return encoder
+
+        def build_fb(config, fsc_flag):
+            """
+            FF model case
+            """
+            # Initializers:
+            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
+            concat_layer = Lambda(lambda x: tf.concat(x, axis=1))
+
+            encoder_transform = Sequential([
+                keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
+                                  batch_input_shape=[config.batch_size, 1, config.x_dim + config.y_dim],
+                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
+                Dense(config.enc_hidden[1], activation="elu"),
+                Dense(config.enc_last_hidden, activation="elu"),
+                Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer)])
+
+            p_out = list()  # list of calculated P(X|H)
+            enc_out = list()  # list of X values
+            channel_out = list()  # list of Y values
+            channel_state = list()
+
+            enc_in_feedback = keras.layers.Input(shape=[1, config.y_dim + config.x_dim])  # Input layer
+            enc_in_0 = enc_in_feedback
+
+            for t in range(config.bptt):
+                if t == 0:
+                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
+                    # for debug:
+                    # p = encoder_transform(enc_in_0)
+                    # p_out.append(0.5*tf.ones(shape=[config.batch_size,1,1], dtype='float64')+0*p)
+                    ##
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append sampled x
+                else:
+                    enc_in_t = tf.concat([enc_out[t - 1], channel_out[t-1]], axis=-1)  # prepare input for time t
+                    p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
+                    # for debug:
+                    # p = encoder_transform(enc_in_0)
+                    # p_out.append(0.5 * tf.ones(shape=[config.batch_size, 1, 1], dtype='float64') + 0 * p)
+                    ##
+
+                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
+                    enc_out.append(x)  # append x_t
+
+                # calculate y_t(x_t)
+                if fsc_flag:
+                    [y_t, s_t] = channel(enc_out[t])
+                    channel_out.append(y_t)
+                    channel_state.append(s_t)
+                else:
+                    channel_out.append(channel(enc_out[t]))
+
+            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
+            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
+            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
+            # channel_state = tf.concat(channel_state, axis=1)
+
+            # channel_out = concat_layer(channel_out)  # transform y list into tensor
+            # enc_out = concat_layer(enc_out)  # transform x list into tensor
+            # p_out = concat_layer(p_out)  # transform p list into tensor
+            # channel_state = concat_layer(channel_state)
+            if fsc_flag:
+                channel_state = tf.concat(channel_state, axis=1)
+                encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out, channel_state])
+                return encoder
+            else:
+                encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out])
+                return encoder
+
+
+        fsc_flag = config.channel_name in ['ising','trapdoor','post','GE']
+
+        if fsc_flag:
+            channel = Channel_Layer_with_channel_states(config=config)  # define channel layer
+        else:
+            channel = Channel_Layer(config=config)  # define channel layer
+
+        sampler_layer = SamplingLayer()
+        sampler = Sequential([sampler_layer])  # sampling model of x from p
+
+
+        if config.feedback == 1:
+            model = build_fb(config, fsc_flag)  # build channel model with feedback, with axis(-1) = 3
+        else:
+            model = build_ff(config, fsc_flag)  # build channel model without feedback, with axis(-1) = 2
+
+        return model
+
+    enc_model = build(config)
+
+    return enc_model
+
+
+
+
+
+# OLD:
 def EncModel(config):
     """
     Channel encoder model - generating [x,y,p]
@@ -284,49 +684,6 @@ def EncModel_no_p_new(config):
     """
 
     def build(config):
-        def build_ff_old(config):
-            """
-            FF model case
-            """
-            # Initializers:
-            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
-
-            # Encoder transformation with sigmoid output:
-            encoder_transform = Sequential([
-                keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
-                                  batch_input_shape=[config.batch_size, 1, config.x_dim],
-                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
-                Dense(config.enc_hidden[1], activation="elu"),
-                # Dense(config.enc_last_hidden, activation="elu"),
-                Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer)])  # WITH SIGMOID AS LAST LAYER
-
-            p_out = list()  # list of calculated P(X|H)
-            enc_out = list()  # list of X values
-            channel_out = list()  # list of Y values
-
-            enc_in_feedback = keras.layers.Input(shape=[1, config.x_dim])  # Input layer
-            enc_in_0 = enc_in_feedback
-
-            for t in range(config.bptt):
-                if t == 0:
-                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
-                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-                    enc_out.append(x)  # append sampled x
-                else:
-                    enc_in_t = enc_out[t - 1]  # prepare input for time t
-                    p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
-                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-                    enc_out.append(x)  # append x_t
-
-                channel_out.append(channel(enc_out[t]))  # calculate y_t(x_t)
-
-            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
-            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
-            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
-
-            encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out])
-            return encoder
-
         def build_ff(config):
             """
             FF model case
@@ -373,7 +730,6 @@ def EncModel_no_p_new(config):
             encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out, channel_state])
 
             return encoder
-
 
         def build_fb(config):
             """
@@ -431,123 +787,6 @@ def EncModel_no_p_new(config):
             encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out, channel_state])
 
             return encoder
-
-        channel = Channel_Layer_no_p_new(config=config)  # define channel layer
-        sampler_layer = SamplingLayer()
-        sampler = Sequential([sampler_layer])  # sampling model of x from p
-
-        if config.feedback == 1:
-            model = build_fb(config)  # build channel model with feedback, with axis(-1) = 3
-        else:
-            model = build_ff(config)  # build channel model without feedback, with axis(-1) = 2
-
-        return model
-
-    enc_model = build(config)
-
-    return enc_model
-
-# for new pdine
-def EncModel_pdine(config):
-    """
-    Channel encoder model - generating [x,y,p]
-    """
-
-    def build(config):
-        def build_ff(config):
-            """
-            FF model case
-            """
-            # Initializers:
-            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
-
-            # Encoder transformation with sigmoid output:
-            encoder_transform = Sequential([
-                keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
-                                  batch_input_shape=[config.batch_size, 1, config.x_dim],
-                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
-                Dense(config.enc_hidden[1], activation="elu"),
-                # Dense(config.enc_last_hidden, activation="elu"),
-                Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer)])  # WITH SIGMOID AS LAST LAYER
-
-            p_out = list()  # list of calculated P(X|H)
-            enc_out = list()  # list of X values
-            channel_out = list()  # list of Y values
-
-            enc_in_feedback = keras.layers.Input(shape=[1, config.x_dim])  # Input layer
-            enc_in_0 = enc_in_feedback
-
-            for t in range(config.bptt):
-                if t == 0:
-                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
-                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-                    enc_out.append(x)  # append sampled x
-                else:
-                    enc_in_t = enc_out[t - 1]  # prepare input for time t
-                    p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
-                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-                    enc_out.append(x)  # append x_t
-
-                channel_out.append(channel(enc_out[t]))  # calculate y_t(x_t)
-
-            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
-            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
-            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
-
-            encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out])
-            return encoder
-
-        def build_fb(config):
-            """
-            FF model case
-            """
-            # Initializers:
-            initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
-
-            encoder_transform = Sequential([
-                keras.layers.LSTM(config.enc_hidden_lstm_size, return_sequences=True, name="LSTM_enc", stateful=True,
-                                  batch_input_shape=[config.batch_size, 1, config.x_dim + config.y_dim],
-                                  dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout)])
-            for size in config.enc_hidden_sizes:
-                encoder_transform.add(Dense(size, activation="elu"))
-
-            encoder_transform.add(Dense(config.x_dim, activation="sigmoid", bias_initializer=initializer))
-
-
-            p_out = list()  # list of calculated P(X|H)
-            enc_out = list()  # list of X values
-            channel_out = list()  # list of Y values
-            channel_state = list()
-
-            enc_in_feedback = keras.layers.Input(shape=[1, config.y_dim + config.x_dim])  # Input layer
-            enc_in_0 = enc_in_feedback
-
-            for t in range(config.bptt):
-                if t == 0:
-                    p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
-                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-                    enc_out.append(x)  # append sampled x
-                else:
-                    enc_in_t = tf.concat([enc_out[t - 1], channel_out[t-1]], axis=-1)  # prepare input for time t
-                    p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
-
-
-                    x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-                    enc_out.append(x)  # append x_t
-
-                [y_t, s_t] = channel(enc_out[t])
-                channel_out.append(y_t)
-                channel_state.append(s_t)
-
-
-            channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
-            enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
-            p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
-            channel_state = tf.concat(channel_state, axis=-1)
-            encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out, channel_state])
-
-            return encoder
-
 
         channel = Channel_Layer_no_p_new(config=config)  # define channel layer
         sampler_layer = SamplingLayer()
@@ -719,122 +958,6 @@ def EncModel_PDINE(config):
     return enc_model
 
 
-
-# Latest change - enc_model_no_p with general alphabet (not done, based on encmodel_no_p):
-# def EncModel_gen_alphabet(config):
-#     """
-#     Neural encoder model - generating [x,y,p]
-#     """
-#
-#     def build(config):
-#         def build_ff(config):
-#             """
-#             FF model case
-#             """
-#             # Initializers:
-#             initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
-#
-#             # Encoder transformation with sigmoid output:
-#             encoder_transform = Sequential([
-#                 keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
-#                                   batch_input_shape=[config.batch_size, 1, config.x_dim],
-#                                   dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
-#                 Dense(config.enc_hidden[1], activation="elu"),
-#                 # Dense(config.enc_last_hidden, activation="elu"),
-#                 Dense(config.alphabet_size, activation="sigmoid", bias_initializer=initializer)])  # WITH SIGMOID AS LAST LAYER
-#
-#             p_out = list()  # list of calculated P(X|H)
-#             enc_out = list()  # list of X values
-#             channel_out = list()  # list of Y values
-#
-#             enc_in_feedback = keras.layers.Input(shape=[1, config.x_dim])  # Input layer
-#             enc_in_0 = enc_in_feedback
-#
-#             for t in range(config.bptt):
-#                 if t == 0:
-#                     p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
-#                     x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-#                     enc_out.append(x)  # append sampled x
-#                 else:
-#                     enc_in_t = enc_out[t - 1]  # prepare input for time t
-#                     p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
-#                     x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-#                     enc_out.append(x)  # append x_t
-#
-#                 channel_out.append(channel(enc_out[t]))  # calculate y_t(x_t)
-#
-#             channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
-#             enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
-#             p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
-#
-#             encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out])
-#             return encoder
-#
-#
-#         def build_fb(config):
-#             """
-#             FF model case
-#             """
-#             # Initializers:
-#             initializer = tf.keras.initializers.RandomNormal(mean=0.5, stddev=0.1)
-#
-#             encoder_transform = Sequential([
-#                 keras.layers.LSTM(config.enc_hidden[0], return_sequences=True, name="LSTM_enc", stateful=True,
-#                                   batch_input_shape=[config.batch_size, 1, config.x_dim + config.y_dim],
-#                                   dropout=config.enc_dropout, recurrent_dropout=config.enc_dropout),
-#                 Dense(config.enc_hidden[1], activation="elu"),
-#                 Dense(config.alphabet_size, activation="softmax", bias_initializer=initializer)])
-#
-#             p_out = list()  # list of calculated P(X|H)
-#             enc_out = list()  # list of X values
-#             channel_out = list()  # list of Y values
-#
-#             enc_in_feedback = keras.layers.Input(shape=[1, config.y_dim + config.x_dim])  # Input layer
-#             enc_in_0 = enc_in_feedback
-#
-#             for t in range(config.bptt):
-#                 if t == 0:
-#                     p_out.append(encoder_transform(enc_in_0))  # append transformation of first input
-#                     # for debug:
-#                     # p = encoder_transform(enc_in_0)
-#                     # p_out.append(0.5*tf.ones(shape=[config.batch_size,1,1], dtype='float64')+0*p)
-#                     ##
-#                     x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-#                     enc_out.append(x)  # append sampled x
-#                 else:
-#                     enc_in_t = tf.concat([enc_out[t - 1], channel_out[t-1]], axis=-1)  # prepare input for time t
-#                     p_out.append(encoder_transform(enc_in_t))  # calculate p_t(in_t)
-#                     # for debug:
-#                     # p = encoder_transform(enc_in_0)
-#                     # p_out.append(0.5 * tf.ones(shape=[config.batch_size, 1, 1], dtype='float64') + 0 * p)
-#                     ##
-#
-#                     x = sampler(p_out[t])  # sample x using the estimated conditional pmf
-#                     enc_out.append(x)  # append x_t
-#
-#                 channel_out.append(channel(enc_out[t]))  # calculate y_t(x_t)
-#
-#             channel_out = tf.concat(channel_out, axis=1)  # transform y list into tensor
-#             enc_out = tf.concat(enc_out, axis=1)  # transform x list into tensor
-#             p_out = tf.concat(p_out, axis=1)  # transform p list into tensor
-#
-#             encoder = Model(inputs=[enc_in_feedback], outputs=[enc_out, channel_out, p_out])
-#             return encoder
-#
-#         channel = Channel_Layer(config=config)  # define channel layer
-#         sampler_layer = SamplingLayer_gen_alphabet(config)
-#         sampler = Sequential([sampler_layer])  # sampling model of x from p
-#
-#         if config.feedback == 1:
-#             model = build_fb(config)  # build channel model with feedback, with axis(-1) = 3
-#         else:
-#             model = build_ff(config)  # build channel model without feedback, with axis(-1) = 2
-#
-#         return model
-#
-#     enc_model = build(config)
-#
-#     return enc_model
 
 
 ##########################

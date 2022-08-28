@@ -46,23 +46,4 @@ class Enc_Loss(tf.keras.losses.Loss):
 
 
 
-class Enc_Loss_Reinforce(tf.keras.losses.Loss):
-    def __init__(self, config, name='enc_loss'):
-        super(Enc_Loss_Reinforce, self).__init__(name=name, reduction='none')
-        self.T = config.T
-        self.bptt = config.bptt
-
-    def call(self, xp, t, **kwargs):
-        [x,p]= xp
-        r = t[0]-t[1]
-        r = tf.squeeze(r, axis=-1)
-        rho = tf.reduce_mean(r)
-        lp = tf.math.log(tf.where(tf.equal(x, 1), p, 1 - p))  # only for binary alphabets
-        sum_list = [tf.reduce_sum(tf.slice(r, [0, k, 0], [tf.shape(r)[0], self.T, tf.shape(r)[-1]]), axis=1, keepdims=True)
-                    for k in range(tf.shape(r)[1] - self.T)]  # [B,1,1]
-        rt = tf.concat(sum_list, axis=1)  # [B,bptt-T,1]
-        [lp, _] = tf.split(lp, axis=1, num_or_size_splits=[self.bptt - self.T, self.T])
-        loss = -tf.reduce_mean(lp * (rt - rho))
-
-        return loss
 

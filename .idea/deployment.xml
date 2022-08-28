@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" autoUpload="Always" serverName="dor@132.72.107.230:9889 password">
+    <serverData>
+      <paths name="dor@132.72.107.172:9889 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/common_space_docker/local/ssd-2/dor/discrete_optimization_unified" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="dor@132.72.107.230:9889 password">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/common_space_docker/local/ssd-2/dor/discrete_optimization_unified" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+    </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
+  </component>
+</project>

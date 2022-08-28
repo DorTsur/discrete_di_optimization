@@ -41,8 +41,8 @@ def read_config(args):
         json_file = args.config
     else:
         # raise ValueError("preprocess config: config path wasn't specified")
-        # json_file = './configs/capacity_estimation.json'  # current pdine config
-        json_file = './configs/capacity_estimation_from_checkpoint.json'  # current pdine config
+        json_file = './configs/capacity_estimation.json'  # current pdine config
+        # json_file = './configs/capacity_estimation_from_checkpoint.json'  # current pdine config
         # json_file = './configs/q_graph.json'  # current pdine config
         # json_file = './configs/input_investigation.json'  # input investigation config
 

@@ -105,37 +105,11 @@ class SamplingLayer(tf.keras.layers.Layer):  # samples x from probability tensor
         returning x of shape [batch_size, 1, dim] with p=Pr(x=1|history)
         *** At the moment this method is implemented for 1D binary data ***
         """
-        # p = tf.squeeze(p_t)  # get rid of spare dimensions for calculation
-        # p_bar = tf.ones_like(p) - p  # calculate 1-p values for logits
-        # logits = tf.math.log(tf.stack([p_bar, p], axis=-1))  # calculate logits from bernoulli sampling, shape [B,2]
 
 
         p = tf.squeeze(p_t, axis=-1)  # get rid of spare dimensions for calculation
         p_bar = tf.ones_like(p) - p  # calculate 1-p values for logits
         logits = tf.math.log(tf.concat([p_bar, p], axis=-1))  # calculate logits from bernoulli sampling, shape [B,2]
-
-        x = tf.random.categorical(logits=logits, num_samples=1)  # sample x~Ber(p) for each [p, p_bar] pair, shape [B, 1]
-        x = tf.expand_dims(x, axis=-1)  # expand for original dims of p_t, shape [B, 1, 1]
-
-        return tf.cast(x, 'float64')
-
-
-class SamplingLayer_gen_alphabet(tf.keras.layers.Layer):  # samples x from probability tensor
-    def __init__(self, config):
-        """
-        Keras layer class to sample from a probability tensor
-        """
-        super(SamplingLayer_gen_alphabet, self).__init__()
-        self.alphabet_size = config.alphabet_size
-
-    def call(self, p_t, mask=None):
-        """
-        recieving p_t of shape [batch_size, 1, dim]
-        returning x of shape [batch_size, 1, dim] with p=Pr(x=1|history)
-        *** At the moment this method is implemented for 1D binary data ***
-        """
-        p_t = tf.squeeze(p_t, axis=1)  # remove axis 1 from shape [B,1,Alph]
-        logits = tf.math.log(p_t)  # calculate logits x~p
 
         x = tf.random.categorical(logits=logits, num_samples=1)  # sample x~Ber(p) for each [p, p_bar] pair, shape [B, 1]
         x = tf.expand_dims(x, axis=-1)  # expand for original dims of p_t, shape [B, 1, 1]
@@ -388,184 +362,25 @@ class LSTMNew(RNN):
                                       unroll=unroll,
                                       **kwargs)
 
+#################### General Alphabets - In progress ##############
+class SamplingLayer_gen_alphabet(tf.keras.layers.Layer):  # samples x from probability tensor
+    def __init__(self, config):
+        """
+        Keras layer class to sample from a probability tensor
+        """
+        super(SamplingLayer_gen_alphabet, self).__init__()
+        self.alphabet_size = config.alphabet_size
 
-#################################################################
-#################################################################
-#################################################################
-####### Unused layers #############
-# class ChannelLayer_old(tf.keras.layers.Layer):  # creates channel outputs from chanel inputs
-#     def __init__(self, channel, p_bsc=None, p_z=None, split=None):
-#         super(ChannelLayer, self).__init__()
-#         self.split = split
-#         self.p_bsc = p_bsc
-#         self.p_z = p_z
-#
-#         if channel == "clean":
-#             self.channel_fn = clean_channel
-#         elif channel == "BSC":
-#             self.channel_fn = bsc_channel
-#         elif channel == "z_ch":
-#             self.channel_fn = z_channel
-#
-#     def call(self, x, mask=None):
-#         """
-#         *** Currently implemnted for 1D samples ***
-#         """
-#         return self.channel_fn(x=x, p_bsc=self.p_bsc, p_z=self.p_z, split=self.split)
+    def call(self, p_t, mask=None):
+        """
+        recieving p_t of shape [batch_size, 1, dim]
+        returning x of shape [batch_size, 1, dim] with p=Pr(x=1|history)
+        *** At the moment this method is implemented for 1D binary data ***
+        """
+        p_t = tf.squeeze(p_t, axis=1)  # remove axis 1 from shape [B,1,Alph]
+        logits = tf.math.log(p_t)  # calculate logits x~p
 
-############### check if to delete ##############
+        x = tf.random.categorical(logits=logits, num_samples=1)  # sample x~Ber(p) for each [p, p_bar] pair, shape [B, 1]
+        x = tf.expand_dims(x, axis=-1)  # expand for original dims of p_t, shape [B, 1, 1]
 
-# class ChannelLayer(tf.keras.layers.Layer):  # creates channel outputs from chanel inputs
-#     def __init__(self, config):
-#         super(ChannelLayer, self).__init__()
-#         self.channel = config.channel_name
-#         self.p_bsc = config.p_bsc
-#         self.p_z = config.p_z
-#         self.p_bec = config.p_bec
-#         self.batch_size = config.batch_size
-#
-#         if self.channel == "clean":
-#             self.channel_fn = clean_channel
-#         elif self.channel == "BSC":
-#             self.channel_fn = bsc_channel
-#         elif self.channel == "z_ch":
-#             self.channel_fn = z_channel
-#         elif self.channel == "s_ch":
-#             self.channel_fn = s_channel
-#         elif self.channel == "BEC":
-#             self.channel_fn = bec_channel
-#         elif self.channel == "ising":
-#             self.channel_fn = ising_channel
-#
-#     def call(self, x, mask=None):
-#         """
-#         *** Currently implemnted for 1D samples ***
-#         """
-#         return self.channel_fn(x=x, p_bsc=self.p_bsc, p_z=self.p_z, p_bec=self.p_bec, batch_size=self.batch_size)
-#
-#
-# class ChannelLayerGE_sampler(tf.keras.layers.Layer):  # creates channel outputs from chanel inputs
-#     def __init__(self, config):
-#         super(ChannelLayerGE_sampler, self).__init__()
-#         self.batch_size = config.batch_size
-#         self.bptt = config.bptt
-#         self.channel_model = Gilbert_Elliot_Sampler(config)
-#         self.channel_fn = self.channel_model.call
-#
-#     def call(self, x, mask=None):
-#         """
-#         *** Currently implemnted for 1D samples ***
-#         """
-#         x_l = tf.split(x, axis=1, num_or_size_splits=self.bptt)
-#         y_l = list()
-#         for x_ in x_l:
-#             y_l.append(self.channel_fn(x=x_, p_bsc=self.p_bsc, p_z=self.p_z, p_bec=self.p_bec, batch_size=self.batch_size))
-#
-#         return tf.concat(y_l, axis=1)
-#
-#
-# def create_log_layer():
-#     layer = Lambda(lambda x: tf.math.log(x))
-#     model = Sequential([layer])
-#     return model
-#
-#
-# ############ GE for Encoder Layers ####################
-# class StateCalcLayer(tf.keras.layers.Layer):
-#     def __init__(self, config):
-#         super(StateCalcLayer, self).__init__()
-#         self.p_g = config.GE_p_g  # BSC G transition probability
-#         self.p_b = config.GE_p_b  # BSC B transition probability
-#         self.b = config.GE_b  # transition probability g->b
-#         self.g = config.GE_g  # transition probability b->g
-#         self.batch_size = config.batch_size
-#         self.bptt = config.bptt
-#         self.calculate_logits()
-#
-#     def calculate_logits(self):
-#         """
-#         calculate the logits of b, g, p_b and p_g
-#         :return:
-#         """
-#         # z_b:
-#         g_to_b = self.b * tf.ones(shape=[self.batch_size, 1])
-#         g_to_g = tf.ones_like(g_to_b) - g_to_b
-#         self.logits_b = tf.math.log(tf.concat([g_to_g, g_to_b], axis=1))  # define logits
-#
-#         # z_g:
-#         b_to_g = self.g * tf.ones(shape=[self.batch_size, 1])
-#         b_to_b = tf.ones_like(b_to_g) - b_to_g
-#         self.logits_g = tf.math.log(tf.concat([b_to_b, b_to_g], axis=1))  # define logits
-#
-#     def call(self, s, mask=None):
-#         """
-#         calculate output from state
-#         :return:
-#         """
-#         # calculate new state:
-#         z_b = tf.expand_dims(tf.cast(tf.random.categorical(logits=self.logits_b, num_samples=1), 'float64'), axis=1)
-#         s_b = tf.math.floormod(s + z_b, 2)  # state transition for state b p(1|0) = self.g
-#         z_g = tf.expand_dims(tf.cast(tf.random.categorical(logits=self.logits_g, num_samples=1), 'float64'), axis=1)
-#         s_g = tf.math.floormod(s + z_g, 2)  # state transition for state g
-#         s_new = tf.where(tf.equal(s, 1), s_g, s_b)
-#
-#         return s_new
-#
-#
-# class SamplerGELayer(tf.keras.layers.Layer):
-#     def __init__(self, config):
-#         super(SamplerGELayer, self).__init__()
-#         self.p_g = config.GE_p_g  # BSC G transition probability
-#         self.p_b = config.GE_p_b  # BSC B transition probability
-#         self.batch_size = config.batch_size
-#         self.bptt = config.bptt
-#         self.calculate_logits()
-#
-#     def calculate_logits(self):
-#         """
-#         calculate the logits of b, g, p_b and p_g
-#         :return:
-#         """
-#
-#         # p_b:
-#         p_b = self.p_b * tf.ones(shape=[self.batch_size, 1])
-#         p_b_bar = tf.ones_like(p_b) - p_b
-#         self.logits_pb = tf.math.log(tf.concat([p_b_bar, p_b], axis=1))
-#
-#         # p_g:
-#         p_g = self.p_g * tf.ones(shape=[self.batch_size, 1])
-#         p_g_bar = tf.ones_like(p_g) - p_g
-#         self.logits_pg = tf.math.log(tf.concat([p_g_bar, p_g], axis=1))
-#
-#     def call(self, xs, mask=None):
-#         [x, s] = tf.split(xs, axis=-1, num_or_size_splits=2)
-#         z_b = tf.expand_dims(tf.cast(tf.random.categorical(logits=self.logits_pb, num_samples=1), 'float64'), axis=1)
-#         y_b = tf.math.floormod(x + z_b, 2)  # input transition for state b
-#         z_g = tf.expand_dims(tf.cast(tf.random.categorical(logits=self.logits_pg, num_samples=1), 'float64'), axis=1)
-#         y_g = tf.math.floormod(x + z_g, 2)  # input transition for state g
-#
-#         # obtain GE channel output:
-#         y = tf.where(tf.equal(s, 1), y_g, y_b)
-#         return y
-#
-#
-# ############ Ising for Encoder Layers ####################
-# class Ising_Layer(tf.keras.layers.Layer):
-#     def __init__(self, config):
-#         super(Ising_Layer, self).__init__()
-#         self.batch_size = config.batch_size
-#         self.bptt = config.bptt
-#         self.state = tf.zeros(shape=[self.batch_size, 1, 1], dtype='float64')
-#
-#     def call(self, x, mask=None):
-#         x = tf.squeeze(x, axis=0)
-#         p = 0.5 * tf.ones(shape=[self.batch_size, 1])
-#         logits = tf.math.log(tf.concat([p, p], axis=1))  # define logits
-#         y_ber = tf.cast(tf.random.categorical(logits=logits, num_samples=1), 'float64')  # sample y
-#         y_ber = tf.expand_dims(y_ber, axis=-1)
-#
-#         y = tf.where(tf.equal(x, self.state), x, y_ber)
-#         self.state = x  # update channel state
-#
-#         return y
-
+        return tf.cast(x, 'float64')
